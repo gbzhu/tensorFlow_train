@@ -1,2 +1,2 @@
 # tensorFlow_train
-### Just use to learn tensorflow for myself
+### tensorflow for myself
