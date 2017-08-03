@@ -1,3 +1,7 @@
+"""
+demo for MNIST data
+author: gbzhu
+"""
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
 
@@ -11,20 +15,32 @@ BATCH_SIZE = 100  # 一个batch的大小
 LEARNING_RATE_BASE = 0.8  # 学习率
 LEARNING_RATE_DECAY = 0.99
 REGULARIZATION_RATE = 0.0001
-TRAINING_STEPS = 30000
+TRAINING_STEPS = 10000
 MOVING_AVERAGE_DECAY = 0.99
 
 
 # 计算前向传播的结果，分为两种
-def inference(input_tensor, avg_class, weights_1, biases_1, weights_2, biases_2):
-    # 没有使用滑动平均类
-    if avg_class is None:
-        # 计算隐藏层的前向传播结果
-        layer_1 = tf.nn.relu(tf.matmul(input_tensor, weights_1) + biases_1)
-        return tf.matmul(layer_1, weights_2) + biases_2
-    else:  # 使用了滑动平均类
-        layer_1 = tf.nn.relu(tf.matmul(input_tensor, avg_class.average(weights_1)) + avg_class.average(biases_1))
-        return tf.matmul(layer_1, avg_class.average(weights_2)) + avg_class.average(biases_2)
+def inference(input_tensor, avg_class, reuse=True):
+    with tf.variable_scope('layer_1', reuse=reuse):
+        weights = tf.get_variable('weights', [INPUT_NODE, LAYER_1_NODE],
+                                  initializer=tf.truncated_normal_initializer(stddev=0.1))
+        biases = tf.get_variable('biases', [LAYER_1_NODE], initializer=tf.constant_initializer(0.0))
+
+        if avg_class is None:
+            # 计算隐藏层的前向传播结果
+            layer_1 = tf.nn.relu(tf.matmul(input_tensor, weights) + biases)
+        else:  # 使用了滑动平均类
+            layer_1 = tf.nn.relu(tf.matmul(input_tensor, avg_class.average(weights)) + avg_class.average(biases))
+
+    with tf.variable_scope('layer_2', reuse=reuse):
+        weights = tf.get_variable('weights', [LAYER_1_NODE, OUTPUT_NODE],
+                                  initializer=tf.truncated_normal_initializer(stddev=0.1))
+        biases = tf.get_variable('biases', [OUTPUT_NODE], initializer=tf.constant_initializer(0.0))
+        # 没有使用滑动平均类
+        if avg_class is None:
+            return tf.matmul(layer_1, weights) + biases
+        else:  # 使用了滑动平均类
+            return tf.matmul(layer_1, avg_class.average(weights)) + avg_class.average(biases)
 
 
 # 神经网络的训练过程
@@ -32,16 +48,8 @@ def train(mnist):
     x = tf.placeholder(tf.float32, shape=[None, INPUT_NODE], name='x-input')
     y_ = tf.placeholder(tf.float32, shape=[None, OUTPUT_NODE], name='y-input')
 
-    # 初始化隐藏层参数
-    weights_1 = tf.Variable(tf.truncated_normal([INPUT_NODE, LAYER_1_NODE], stddev=0.1))
-    biases_1 = tf.Variable(tf.constant(0.1, shape=[LAYER_1_NODE]))
-    # 初始化输出层参数
-    weights_2 = tf.Variable(tf.truncated_normal([LAYER_1_NODE, OUTPUT_NODE], stddev=0.1))
-    biases_2 = tf.Variable(tf.constant(0.1, shape=[OUTPUT_NODE]))
-
     # 计算当前参数下的前向传播结果，不使用滑动平均类
-    y = inference(input_tensor=x, avg_class=None, weights_1=weights_1, biases_1=biases_1, weights_2=weights_2,
-                  biases_2=biases_2)
+    y = inference(input_tensor=x, avg_class=None, reuse=False)
 
     # 定义存储训练轮数的变量，不需要计算滑动平均值，指定为不可训练的变量
     global_step = tf.Variable(0, trainable=False)
@@ -52,7 +60,7 @@ def train(mnist):
     variable_averages_op = variable_averages.apply(tf.trainable_variables())
 
     # 计算使用滑动平均之后的前向传播的结果
-    average_y = inference(x, variable_averages, weights_1, biases_1, weights_2, biases_2)
+    average_y = inference(input_tensor=x, avg_class=variable_averages, reuse=True)
 
     # 计算损失函数（交叉熵）
     # tf.argmax(): [0,0,0,0,0,0,0,0,1]  =>  9
@@ -64,8 +72,13 @@ def train(mnist):
     # L2正则化函数
     regularizer = tf.contrib.layers.l2_regularizer(REGULARIZATION_RATE)
     # 计算模型的正则化损失
-    regularization = regularizer(weights_1) + regularizer(weights_2)
+    print(tf.get_variable_scope().reuse)
+    print(tf.get_variable_scope().reuse)
 
+    # 这一步需要要，很关键，不然拿不到weights的值
+    with tf.variable_scope('', reuse=True):
+        regularization = regularizer(tf.get_variable('layer_1/weights')) + regularizer(
+            tf.get_variable('layer_2/weights'))
     # 总损失 = 交叉熵 + 正则化损失
     loss = cross_entropy_mean + regularization
 
