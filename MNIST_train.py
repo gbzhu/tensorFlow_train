@@ -73,7 +73,6 @@ def train(mnist):
     regularizer = tf.contrib.layers.l2_regularizer(REGULARIZATION_RATE)
     # 计算模型的正则化损失
     print(tf.get_variable_scope().reuse)
-    print(tf.get_variable_scope().reuse)
 
     # 这一步需要要，很关键，不然拿不到weights的值
     with tf.variable_scope('', reuse=True):
