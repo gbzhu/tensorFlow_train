@@ -64,6 +64,7 @@ def train(mnist):
 
     # 计算损失函数（交叉熵）
     # tf.argmax(): [0,0,0,0,0,0,0,0,1]  =>  9
+    # 这个函数的参数要显示地传参
     cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=y, labels=tf.argmax(y_, 1))
     # 计算当前batch中所用样例的交叉熵的平均值
     cross_entropy_mean = tf.reduce_mean(cross_entropy)
@@ -118,9 +119,9 @@ def train(mnist):
 
 
 def main():
-    mnist = input_data.read_data_sets('/Users/gbzhu/dataset/MNIST_data', one_hot=True)
+    # mnist = input_data.read_data_sets('/Users/gbzhu/dataset/MNIST_data', one_hot=True)  # for mac
+    mnist = input_data.read_data_sets('/home/gbzhu/datasets/MNIST_data', one_hot=True)   # for linux
     train(mnist)
-
 
 if __name__ == '__main__':
     main()
